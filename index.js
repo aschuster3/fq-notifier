@@ -1,27 +1,37 @@
-const serverless = require('serverless-http');
-const bodyParser = require('body-parser');
-const request = require('request');
-const express = require('express');
-const app = express();
+let request = require('request');
 
-const slackhook = 'https://hooks.slack.com/services/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';
+const API_URL = process.env.CLOCKWISE_API_URL
 
-let requestParser = function(request_id, action) {
-  if(action !== 'create') return 'Do nothing';
-  request.post(slackhook, { form: { payload: '{ "text": "Yo boi" }' }});
-  return 'Do something';
+const SUCCESS_RESPONSE = {
+  statusCode: 200,
+  body: 'ok'
 }
 
-app.use(bodyParser.json({ strict: false }));
+const DO_NOTHING_RESPONSE = {
+  statusCode: 200,
+  body: 'do_nothing'
+}
 
-app.get('/', function (req, res) {
-  request.post(slackhook, { form: { payload: '{ "text": "Hey team" }' }})
-  res.send('Hello World');
-})
+function processNewTask(task_id, state) {
+  let options = {
+    url: `https://apistaging.clockwisemd.com/v1/appointments/${task_id}`,
+    headers: {
+      'Accept': 'application/json',
+      'Authtoken': process.env.CLOCKWISE_API_KEY
+    }
+  }
+  request(options, (error, response, body) => {
+    let form_sub = { form: { payload: '{ "text": ' + JSON.stringify(body) + '}' }}
+    request.post(process.env.SLACKHOOK, form_sub);
+  });
+}
 
-app.post('/fq-notify', function (req, res) {
-  const { appointment_id, action } = req.body
-  res.send(requestParser(appointment_id, action));
-})
-
-module.exports.handler = serverless(app);
+module.exports.handler = (event, context, callback) => {
+  let body = JSON.parse(event.body)
+  if(body.action !== 'create' && body.action !== 'callback') {
+    callback(null, DO_NOTHING_RESPONSE);
+    return;
+  }
+  processNewTask(body.appointment_id, body.action)
+  callback(null, SUCCESS_RESPONSE);
+};

@@ -10,9 +10,6 @@ functions:
   app:
     handler: index.handler
     events:
-      - http: ANY /
-      - http: 'ANY {proxy+}'
-  firemanQueueEvent:
-    handler: index.handler
-    events:
-      - http: 'POST /fq-notify'
+      - http:
+          path: fq-notify
+          method: post
