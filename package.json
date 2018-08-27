@@ -10,9 +10,6 @@
   "author": "Andrew Schuster",
   "license": "MIT",
   "dependencies": {
-    "body-parser": "^1.18.3",
-    "express": "^4.16.3",
-    "request": "^2.88.0",
-    "serverless-http": "^1.6.0"
+    "request": "^2.88.0"
   }
 }
