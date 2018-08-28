@@ -22,7 +22,7 @@ function determineHospitalOrGroup(task) {
     return element.name === 'Group ID';
   });
   if (hospital_id_field.value !== '') { return 'Hospital(s) ' + hospital_id_field.value; }
-  else if (group_id_field.value !== '') { return 'Groups(s) ' + group_id_field.value; }
+  else if (group_id_field.value !== '') { return 'Group(s) ' + group_id_field.value; }
   else { return 'unspecified hospital(s)'; }
 }
 
@@ -56,10 +56,10 @@ function processNewTask(task_id, state) {
 
 module.exports.handler = (event, context, callback) => {
   let body = JSON.parse(event.body)
-  if(body.action !== 'create' && body.action !== 'callback') {
+  if(body.event_type !== 'create') {
     callback(null, DO_NOTHING_RESPONSE);
     return;
   }
-  processNewTask(body.appointment_id, body.action)
+  processNewTask(body.appointment_id, body.event_type)
   callback(null, SUCCESS_RESPONSE);
 };
