@@ -1,28 +1,39 @@
 let request = require('request');
 
-const API_URL = process.env.CLOCKWISE_API_URL
+const API_URL = process.env.CLOCKWISE_API_URL;
+const API_KEY = process.env.CLOCKWISE_API_KEY;
+const SLACKHOOK = process.env.SLACKHOOK;
 
 const SUCCESS_RESPONSE = {
   statusCode: 200,
   body: 'ok'
-}
+};
 
 const DO_NOTHING_RESPONSE = {
   statusCode: 200,
   body: 'do_nothing'
+};
+
+function formSlackMessage(task_body) {
+  const parsed_task_body = JSON.parse(task_body);
+  const pre_message_text = 'New request in Fireman Queue from ' + parsed_task_body.first_name;
+  let base_message = { fallback: pre_message_text, pretext: pre_message_text, color: 'danger' };
+  base_message.fields = [{ title: 'Issue with H111', value: 'Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaah' }]
+  return JSON.stringify([base_message])
 }
 
 function processNewTask(task_id, state) {
   let options = {
-    url: `https://apistaging.clockwisemd.com/v1/appointments/${task_id}`,
+    url: `${API_URL}${task_id}?include_custom_fields=true`,
     headers: {
       'Accept': 'application/json',
-      'Authtoken': process.env.CLOCKWISE_API_KEY
+      'Authtoken': API_KEY
     }
   }
   request(options, (error, response, body) => {
-    let form_sub = { form: { payload: '{ "text": ' + JSON.stringify(body) + '}' }}
-    request.post(process.env.SLACKHOOK, form_sub);
+    let message_content = formSlackMessage(body);
+    const form_sub = { form: { payload: '{ "attachments": ' + message_content + '}' }}
+    request.post(SLACKHOOK, form_sub);
   });
 }
 
