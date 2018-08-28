@@ -14,11 +14,28 @@ const DO_NOTHING_RESPONSE = {
   body: 'do_nothing'
 };
 
-function formSlackMessage(task_body) {
-  const parsed_task_body = JSON.parse(task_body);
-  const pre_message_text = 'New request in Fireman Queue from ' + parsed_task_body.first_name;
-  let base_message = { fallback: pre_message_text, pretext: pre_message_text, color: 'danger' };
-  base_message.fields = [{ title: 'Issue with H111', value: 'Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaah' }]
+function determineHospitalOrGroup(task) {
+  const hospital_id_field = task.extra_fields.find((element) => {
+    return element.name === 'Hospital ID';
+  });
+  const group_id_field = task.extra_fields.find((element) => {
+    return element.name === 'Group ID';
+  });
+  if (hospital_id_field.value !== '') { return 'Hospital(s) ' + hospital_id_field.value; }
+  else if (group_id_field.value !== '') { return 'Groups(s) ' + group_id_field.value; }
+  else { return 'unspecified hospital(s)'; }
+}
+
+function formSlackMessage(raw_task_body) {
+  const task = JSON.parse(raw_task_body);
+  const pre_message = 'New request in Fireman Queue from ' + task.first_name;
+  const issue_message = 'Issue with ' + determineHospitalOrGroup(task);
+  const description_field = task.extra_fields.find((element) => {
+    return element.name === 'Description';
+  });
+
+  let base_message = { fallback: pre_message, pretext: pre_message, color: 'danger' };
+  base_message.fields = [{ title: issue_message, value: description_field.value, short: false }]
   return JSON.stringify([base_message])
 }
 
