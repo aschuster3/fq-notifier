@@ -1,7 +1,7 @@
 # FQ Notifier
 A simple serverless app that converts a task posted to the Fireman Queue into a rich-text Slack message
 
-## Setup
+### Setup
 Step 0) Install the serverless node package.  I recommend having it globally available.
 ```sh
 $ npm install --global serverless
@@ -18,7 +18,7 @@ $ aws configure --profile [your-desired-profile-name]
 
 Step 1) To deploy the function, run the following:
 ```sh
-serverless deploy -v --aws-profile serverlessAdmin
+$ serverless deploy -v --aws-profile serverlessAdmin
 ```
 
 Step 2) After the function has finished, navigate to the AWS Lambda console, select your newly created
@@ -26,10 +26,10 @@ function and add the Environment Variables for `CLOCKWISE_API_URL`, `CLOCKWISE_A
 
 And that's it!
 
-## Changing
+### Changing
 Assuming you've gone through the Setup steps, if you want to make any changes, you can run the following
 to quickly push up your changes.
 ```sh
-serverless deploy function -f app --aws-profile serverlessAdmin
+$ serverless deploy function -f app --aws-profile serverlessAdmin
 ```
 
