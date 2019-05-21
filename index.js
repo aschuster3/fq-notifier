@@ -37,16 +37,40 @@ function determineHospitalOrGroup(task) {
   else { return 'unspecified hospital(s)'; }
 }
 
+function pluckHelpfulLinks(task) {
+  const hospital_id_field = task.extra_fields.find((element) => {
+    return element.name === 'Hospital ID';
+  });
+  const group_id_field = task.extra_fields.find((element) => {
+    return element.name === 'Group ID';
+  });
+  let helpfulLinks
+  if (hospital_id_field.value !== '') {
+    helpfulLinks = [
+      `https://www.clockwisemd.com/hospitals/${hospital_id_field.value}/patient_queue`,
+      `https://www.clockwisemd.com/team/admin/hospitals/${hospital_id_field.value}`
+    ]
+  }
+  else if (group_id_field.value !== '') {
+    helpfulLinks = [
+      `https://www.clockwisemd.com/groups/${group_id_field.value}`,
+      `https://www.clockwisemd.com/team/admin/groups/${group_id_field.value}`
+    ]
+  }
+  return helpfulLinks.join("\n");
+}
+
 function formSlackMessage(raw_task_body) {
   const task = JSON.parse(raw_task_body);
   const pre_message = 'New request in Fireman Queue from ' + task.first_name;
   const issue_message = 'Issue with ' + determineHospitalOrGroup(task);
+  const helpful_links = pluckHelpfulLinks(task);
   const description_field = task.extra_fields.find((element) => {
     return element.name === 'Description';
   });
 
   let base_message = { fallback: pre_message, callback_id: task.id, pretext: pre_message, color: 'warning' };
-  base_message.fields = [{ title: issue_message, value: description_field.value, short: false }]
+  base_message.fields = [{ title: issue_message, value: description_field.value + "\n\n" + helpful_links, short: false }]
 
   // These actions are used below to determine how to act on a FQ task
   base_message.actions = [{ name: "task", text: "Complete", type: "button", style: "primary", value: "callback" },
