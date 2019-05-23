@@ -1,3 +1,6 @@
+# Deprecation Notice
+This project has been migrated to an Experity public repository, further updates should be made there
+
 # FQ Notifier
 A simple serverless app that converts a task posted to the Fireman Queue into a rich-text Slack message
 
