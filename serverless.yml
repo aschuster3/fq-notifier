@@ -6,6 +6,12 @@ provider:
   stage: main
   region: us-east-1
 
+package:
+  exclude:
+    - .eslintrc.json
+    - package-lock.json
+    - README.md
+
 functions:
   app:
     handler: index.handler

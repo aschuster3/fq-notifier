@@ -1,100 +1,115 @@
-let request = require('request');
-let qs = require('querystring');
+let request = require('request')
+let qs = require('querystring')
 
-const API_URL = process.env.CLOCKWISE_API_URL;
-const API_KEY = process.env.CLOCKWISE_API_KEY;
+const API_URL = process.env.CLOCKWISE_API_URL
+const API_KEY = process.env.CLOCKWISE_API_KEY
 
 const SLACK_CHAT_POST_ROUTE = 'https://slack.com/api/chat.postMessage'
 const SLACK_CHAT_UPDATE_ROUTE = 'https://slack.com/api/chat.update'
 const SLACK_OAUTH_ACCESS = process.env.SLACK_OAUTH_ACCESS
 
+const SLACK_CHANNEL = '#fireman'
+
 const SUCCESS_RESPONSE = {
   statusCode: 200,
   body: 'ok'
-};
+}
 
 const DO_NOTHING_RESPONSE = {
   statusCode: 200,
   body: 'do_nothing'
-};
+}
 
 const EMPTY_RESPONSE = {
   statusCode: 200
-};
-
-const FORM_URLENCODED = 'application/x-www-form-urlencoded';
-const APPLICATION_JSON = 'application/json';
-
-function determineHospitalOrGroup(task) {
-  const hospital_id_field = task.extra_fields.find((element) => {
-    return element.name === 'Hospital ID';
-  });
-  const group_id_field = task.extra_fields.find((element) => {
-    return element.name === 'Group ID';
-  });
-  if (hospital_id_field.value !== '') { return 'Hospital(s) ' + hospital_id_field.value; }
-  else if (group_id_field.value !== '') { return 'Group(s) ' + group_id_field.value; }
-  else { return 'unspecified hospital(s)'; }
 }
 
-function pluckHelpfulLinks(task) {
-  const hospital_id_field = task.extra_fields.find((element) => {
-    return element.name === 'Hospital ID';
-  });
-  const group_id_field = task.extra_fields.find((element) => {
-    return element.name === 'Group ID';
-  });
+const ACTION_RESPONSES = {
+  'callback': {
+    'color': '2eb886',
+    'title': 'Task marked complete!'
+  },
+  'remove': {
+    'color': 'a30200',
+    'title': 'Task was removed!'
+  }
+}
+
+const FORM_URLENCODED = 'application/x-www-form-urlencoded'
+const APPLICATION_JSON = 'application/json'
+
+function determineHospitalOrGroup (task) {
+  const hospitalIdField = task.extra_fields.find((element) => {
+    return element.name === 'Hospital ID'
+  })
+  const groupIdField = task.extra_fields.find((element) => {
+    return element.name === 'Group ID'
+  })
+  if (hospitalIdField.value !== '') {
+    return 'Hospital(s) ' + hospitalIdField.value
+  } else if (groupIdField.value !== '') {
+    return 'Group(s) ' + groupIdField.value
+  } else { return 'unspecified hospital(s)' }
+}
+
+function pluckHelpfulLinks (task) {
+  const hospitalIdField = task.extra_fields.find((element) => {
+    return element.name === 'Hospital ID'
+  })
+  const groupIdField = task.extra_fields.find((element) => {
+    return element.name === 'Group ID'
+  })
   let helpfulLinks
-  if (hospital_id_field.value !== '') {
+  if (hospitalIdField.value !== '') {
     helpfulLinks = [
-      `https://www.clockwisemd.com/hospitals/${hospital_id_field.value}/patient_queue`,
-      `https://www.clockwisemd.com/team/admin/hospitals/${hospital_id_field.value}`
+      `https://www.clockwisemd.com/hospitals/${hospitalIdField.value}/patient_queue`,
+      `https://www.clockwisemd.com/team/admin/hospitals/${hospitalIdField.value}`
+    ]
+  } else if (groupIdField.value !== '') {
+    helpfulLinks = [
+      `https://www.clockwisemd.com/groups/${groupIdField.value}`,
+      `https://www.clockwisemd.com/team/admin/groups/${groupIdField.value}`
     ]
   }
-  else if (group_id_field.value !== '') {
-    helpfulLinks = [
-      `https://www.clockwisemd.com/groups/${group_id_field.value}`,
-      `https://www.clockwisemd.com/team/admin/groups/${group_id_field.value}`
-    ]
-  }
-  return helpfulLinks.join("\n");
+  return helpfulLinks.join('\n')
 }
 
-function formSlackMessage(raw_task_body) {
-  const task = JSON.parse(raw_task_body);
-  const pre_message = 'New request in Fireman Queue from ' + task.first_name;
-  const issue_message = 'Issue with ' + determineHospitalOrGroup(task);
-  const helpful_links = pluckHelpfulLinks(task);
-  const description_field = task.extra_fields.find((element) => {
-    return element.name === 'Description';
-  });
+function formSlackMessage (rawTaskBody) {
+  const task = JSON.parse(rawTaskBody)
+  const preMessage = 'New request in Fireman Queue from ' + task.first_name
+  const issueMessage = 'Issue with ' + determineHospitalOrGroup(task)
+  const helpfulLinks = pluckHelpfulLinks(task)
+  const descriptionField = task.extra_fields.find((element) => {
+    return element.name === 'Description'
+  })
 
-  let base_message = { fallback: pre_message, callback_id: task.id, pretext: pre_message, color: 'warning' };
-  base_message.fields = [{ title: issue_message, value: description_field.value + "\n\n" + helpful_links, short: false }]
+  let baseMessage = { fallback: preMessage, callback_id: task.id, pretext: preMessage, color: 'warning' }
+  baseMessage.fields = [{ title: issueMessage, value: descriptionField.value + '\n\n' + helpfulLinks, short: false }]
 
   // These actions are used below to determine how to act on a FQ task
-  base_message.actions = [{ name: "task", text: "Complete", type: "button", style: "primary", value: "callback" },
-                          { name: "task", text: "Remove", type: "button", style: "danger", value: "remove" }]
-  return JSON.stringify([base_message])
+  baseMessage.actions = [{ name: 'task', text: 'Complete', type: 'button', style: 'primary', value: 'callback' },
+    { name: 'task', text: 'Remove', type: 'button', style: 'danger', value: 'remove' },
+    { name: 'task', text: 'Add To Playbook', type: 'button', value: 'playbook' }]
+  return JSON.stringify([baseMessage])
 }
 
-function processNewTask(task_id, state) {
+function processNewTask (taskId, state) {
   let options = {
-    url: `${API_URL}${task_id}?include_custom_fields=true`,
+    url: `${API_URL}${taskId}?include_custom_fields=true`,
     headers: {
       'Accept': 'application/json',
       'Authtoken': API_KEY
     }
   }
   request(options, (error, response, body) => {
-    let message_content = formSlackMessage(body);
-    let next_options = {
+    let messageContent = formSlackMessage(body)
+    let nextOptions = {
       method: 'POST',
       uri: SLACK_CHAT_POST_ROUTE,
       form: {
         token: SLACK_OAUTH_ACCESS,
-        channel: '#fireman',
-        attachments: message_content,
+        channel: SLACK_CHANNEL,
+        attachments: messageContent,
         as_user: true
       },
       headers: {
@@ -102,23 +117,26 @@ function processNewTask(task_id, state) {
         'Accept': APPLICATION_JSON
       }
     }
-    request(next_options);
-  });
+    console.log('Posted Slack Message!')
+    console.log(error)
+    console.log(response)
+    request(nextOptions)
+  })
 }
 
-function firemanQueueTaskResponse(body, callback) {
-  if(body.event_type !== 'create') {
-    callback(null, DO_NOTHING_RESPONSE);
-    return;
+function firemanQueueTaskResponse (body, callback) {
+  if (body.event_type !== 'create') {
+    callback(null, DO_NOTHING_RESPONSE)
+    return
   }
   processNewTask(body.appointment_id, body.event_type)
-  callback(null, SUCCESS_RESPONSE);
+  callback(null, SUCCESS_RESPONSE)
 }
 
-function taskPostProcessing(action, task_id) {
+function taskPostProcessing (action, taskId) {
   let options = {
     method: 'PUT',
-    url: `${API_URL}${task_id}/${action}`,
+    url: `${API_URL}${taskId}/${action}`,
     headers: {
       'Accept': 'application/json',
       'Authtoken': API_KEY
@@ -134,23 +152,51 @@ function taskPostProcessing(action, task_id) {
   })
 }
 
-function slackTaskPostProcessing(body, action) {
+function taskPlaybookPostProcessing (body) {
+  const link = `https://docutap.slack.com/archives/${body.channel.id}/p${body.message_ts}`
+  const playbookData = {
+    'custom_fields': {
+      '1320': `<a href=${link} rel="noopener noreferrer" target="_blank">Link to Message</a>`
+    }
+  }
+
+  let options = {
+    method: 'PUT',
+    url: `${API_URL}${body.callback_id}/update`,
+    json: playbookData,
+    headers: {
+      'Accept': 'application/json',
+      'Authtoken': API_KEY
+    }
+  }
+
+  // Update the FQ task on Clockwise
+  request(options, (error, response, body) => {
+    console.log('This is the CW post playbook task response')
+    console.log(error)
+    console.log(response)
+    console.log(body)
+  })
+}
+
+function slackTaskPostProcessing (body, action) {
   // good: 2eb886
   // warning: daa038
   // danger: a30200
+  let newAttachments = body.original_message.attachments
 
-  let new_attachments = body.original_message.attachments
-  delete new_attachments[0].actions
-
-  if(action === 'callback') {
-    new_attachments[0].color = '2eb886'
-    new_attachments[0].fields.push({ title: 'Task marked complete!' })
-  } else if (action === 'remove') {
-    new_attachments[0].color = 'a30200'
-    new_attachments[0].fields.push({ title: 'Task was removed!' })
+  if (action === 'playbook') {
+    newAttachments = playbookProcessing(body)
   } else {
-    delete new_attachments[0].color
-    new_attachments[0].fields.push({ title: 'I have no idea what you did!' })
+    delete newAttachments[0].actions
+
+    if (ACTION_RESPONSES[action]) {
+      newAttachments[0].color = ACTION_RESPONSES[action].color
+      newAttachments[0].fields.push({ title: ACTION_RESPONSES[action].title })
+    } else {
+      delete newAttachments[0].color
+      newAttachments[0].fields.push({ title: 'I have no idea what you did!' })
+    }
   }
 
   let options = {
@@ -160,7 +206,7 @@ function slackTaskPostProcessing(body, action) {
       token: SLACK_OAUTH_ACCESS,
       channel: body.channel.id,
       ts: body.message_ts,
-      attachments: JSON.stringify(new_attachments),
+      attachments: JSON.stringify(newAttachments),
       as_user: true
     },
     headers: {
@@ -178,25 +224,37 @@ function slackTaskPostProcessing(body, action) {
   })
 }
 
-function slackResponse(body, callback) {
+function playbookProcessing (body) {
+  let newAttachments = body.original_message.attachments
+  newAttachments[0].actions = newAttachments[0].actions.filter(item => item.value !== 'playbook')
+  newAttachments[0].fields[0].value += '\n*Note made to add to playbook!*'
+
+  return newAttachments
+}
+
+function slackResponse (body, callback) {
   // Immediately respond so we can process at our own pace
   callback(null, EMPTY_RESPONSE)
 
-  // The action should return `callback` or `remove`,
+  // The action should return `callback`, `remove`, or `playbook`,
   // which determines what happens to the fq task
   let action = body.actions[0].value
-
-  taskPostProcessing(action, body.callback_id)
+  if (action === 'callback' || action === 'remove') {
+    taskPostProcessing(action, body.callback_id)
+  } else if (action === 'playbook') {
+    taskPlaybookPostProcessing(body)
+  }
   slackTaskPostProcessing(body, action)
 }
 
-function digestEvent(event) {
+function digestEvent (event) {
   // Slack apps send responnses as URL encoded forms, so this
   // is a general purpose method of processing those
-  if(event.headers['Content-Type'] === FORM_URLENCODED) {
-    let parsed_form = qs.parse(event.body)
-    return JSON.parse(parsed_form.payload)
+  if (event.headers['Content-Type'] === FORM_URLENCODED) {
+    let parsedForm = qs.parse(event.body)
+    return JSON.parse(parsedForm.payload)
   }
+
   return JSON.parse(event.body)
 }
 
@@ -205,6 +263,6 @@ module.exports.handler = (event, context, callback) => {
   let userAgent = event.headers['User-Agent']
 
   // A pretty hacky check to see if the message came from Slack
-  if(userAgent.indexOf('Slack') !== -1) return slackResponse(body, callback)
+  if (userAgent.indexOf('Slack') !== -1) return slackResponse(body, callback)
   firemanQueueTaskResponse(body, callback)
-};
+}
