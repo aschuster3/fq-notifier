@@ -153,7 +153,7 @@ function taskPostProcessing (action, taskId) {
 }
 
 function taskPlaybookPostProcessing (body) {
-  const link = `https://docutap.slack.com/archives/${body.channel.id}/p${body.message_ts}`
+  const link = `https://experity.slack.com/archives/${body.channel.id}/p${body.message_ts}`
   const playbookData = {
     'custom_fields': {
       '1320': `<a href=${link} rel="noopener noreferrer" target="_blank">Link to Message</a>`
