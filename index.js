@@ -263,6 +263,6 @@ module.exports.handler = (event, context, callback) => {
   let userAgent = event.headers['User-Agent']
 
   // A pretty hacky check to see if the message came from Slack
-  if (userAgent.indexOf('Slack') !== -1) return slackResponse(body, callback)
+  if (userAgent && userAgent.indexOf('Slack') !== -1) return slackResponse(body, callback)
   firemanQueueTaskResponse(body, callback)
 }
