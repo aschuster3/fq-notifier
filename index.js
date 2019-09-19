@@ -38,47 +38,49 @@ const ACTION_RESPONSES = {
 const FORM_URLENCODED = 'application/x-www-form-urlencoded'
 const APPLICATION_JSON = 'application/json'
 
-function determineHospitalOrGroup (task) {
-  const hospitalIdField = task.extra_fields.find((element) => {
-    return element.name === 'Hospital ID'
-  })
-  const groupIdField = task.extra_fields.find((element) => {
-    return element.name === 'Group ID'
-  })
-  if (hospitalIdField.value !== '') {
-    return 'Hospital(s) ' + hospitalIdField.value
-  } else if (groupIdField.value !== '') {
-    return 'Group(s) ' + groupIdField.value
-  } else { return 'unspecified hospital(s)' }
-}
-
-function pluckHelpfulLinks (task) {
-  const hospitalIdField = task.extra_fields.find((element) => {
-    return element.name === 'Hospital ID'
-  })
-  const groupIdField = task.extra_fields.find((element) => {
-    return element.name === 'Group ID'
-  })
-  let helpfulLinks
-  if (hospitalIdField.value !== '') {
-    helpfulLinks = [
+function determineEntity (task, type) {
+  const entity = task.extra_fields.find((element) => { return element.name === 'Who?' }).value
+  let string = null
+  let link = []
+  if (entity === 'hospital') {
+    const hospitalIdField = task.extra_fields.find((element) => {
+      return element.name === 'Hospital ID'
+    })
+    string = `Hospital(s) ${hospitalIdField.value}`
+    link = [
       `https://www.clockwisemd.com/hospitals/${hospitalIdField.value}/patient_queue`,
       `https://www.clockwisemd.com/team/admin/hospitals/${hospitalIdField.value}`
     ]
-  } else if (groupIdField.value !== '') {
-    helpfulLinks = [
+  } else if (entity === 'group') {
+    const groupIdField = task.extra_fields.find((element) => {
+      return element.name === 'Group ID'
+    })
+    string = `Group(s) ${groupIdField.value}`
+    link = [
       `https://www.clockwisemd.com/groups/${groupIdField.value}`,
       `https://www.clockwisemd.com/team/admin/groups/${groupIdField.value}`
     ]
+  } else if (entity === 'organization') {
+    const orgIdField = task.extra_fields.find((element) => {
+      return element.name === 'Org ID'
+    })
+    string = 'Org(s) ' + orgIdField.value
+    link = [
+      `https://www.clockwisemd.com/organizations/${orgIdField.value}/users`,
+      `https://www.clockwisemd.com/team/admin/organizations/${orgIdField.value}`
+    ]
   }
-  return helpfulLinks.join('\n')
+  if (!string) {
+    return 'unspecified hospital(s)'
+  }
+  return type === 'string' ? string : link.join('\n')
 }
 
 function formSlackMessage (rawTaskBody) {
   const task = JSON.parse(rawTaskBody)
   const preMessage = 'New request in Fireman Queue from ' + task.first_name
-  const issueMessage = 'Issue with ' + determineHospitalOrGroup(task)
-  const helpfulLinks = pluckHelpfulLinks(task)
+  const issueMessage = 'Issue with ' + determineEntity(task, 'string')
+  const helpfulLinks = determineEntity(task, 'links')
   const descriptionField = task.extra_fields.find((element) => {
     return element.name === 'Description'
   })
