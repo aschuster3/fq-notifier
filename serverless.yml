@@ -2,7 +2,7 @@ service: fq-notifier
 
 provider:
   name: aws
-  runtime: nodejs8.10
+  runtime: nodejs12.x
   stage: main
   region: us-east-1
 
